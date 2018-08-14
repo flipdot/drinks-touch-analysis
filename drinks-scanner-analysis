@@ -1,0 +1,66 @@
+#!/usr/bin/env python3
+# Loads drinks purchase statistics with according user database and plots it in a meaningful way.
+
+import os
+import requests
+
+import numpy as np
+import pandas as pd
+
+from pathlib import Path
+from bs4 import BeautifulSoup # TODO Fix version in requirements.txt
+
+LDAP_SCRAPE_HOST = '192.168.3.231' # power-pi.fd ?
+DRINKS_DATA_HOST = '192.168.3.231' # drinks.fd
+
+DATA_DIRECTORY = 'data'
+LDAP_DATA_FILE = '{}/users.csv'.format(DATA_DIRECTORY)
+
+
+def get_ldap_users(reload=False):
+    # Load local data if it exists and reloading is disabled
+    ldap_data_file = Path(LDAP_DATA_FILE)
+    if not reload and ldap_data_file.is_file():
+        #return np.genfromtxt(LDAP_DATA_FILE, delimiter=';', skip_header=1)# dtype=(np.string_, int))
+        # Pandas to the rescue!
+        return pd.read_csv(LDAP_DATA_FILE)
+
+    # Request scraping content
+    r = requests.get('http://{}/'.format(LDAP_SCRAPE_HOST))
+    if r.status_code != 200:
+        raise ConnectionError('Could not connect to LDAP scrape host ({})!'.format(LDAP_SCRAPE_HOST))
+    if r.text == '':
+        raise ConnectionError('Could not collect data from LDAP scrape host ({})!'.format(LDAP_SCRAPE_HOST))
+
+    # Scrape
+    soup = BeautifulSoup(r.text, 'html.parser')
+    users = ['USERS']
+    uids = ['UIDS']
+    for option in soup.find_all('option'):
+        user = option.get_text().strip()
+        uid = option.get('value').strip()
+        # Skip erroneous/empty entries
+        if not user or not uid or user == '' or uid == '':
+            continue
+        users.append(user)
+        uids.append(uid)
+
+    # Create data directory if necessary
+    if not os.path.exists(DATA_DIRECTORY):
+        os.makedirs(DATA_DIRECTORY)
+
+    # Save data to disk
+    np.savetxt(LDAP_DATA_FILE, np.c_[users, uids], delimiter=';', fmt='%s')
+    return get_ldap_users()
+
+
+def get_drinks_data(reload=False):
+    return
+
+
+if __name__ == '__main__':
+    users = get_ldap_users()
+    drinks_data = get_drinks_data()
+
+    print(users)
+    print(drinks_data)
