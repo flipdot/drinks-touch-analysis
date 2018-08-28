@@ -1,3 +1,4 @@
-requests>=2.19.1
-numpy>=1.15.0
 bs4
+numpy>=1.15.0
+pandas>=0.23.4
+requests>=2.19.1
