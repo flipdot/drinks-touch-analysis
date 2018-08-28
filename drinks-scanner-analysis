@@ -14,6 +14,7 @@ LDAP_SCRAPE_HOST = '192.168.3.231' # power-pi.fd ?
 DRINKS_DATA_HOST = '192.168.3.231' # drinks.fd
 
 DATA_DIRECTORY = 'data'
+CSV_SEPARATOR = ';'
 LDAP_DATA_FILE = '{}/users.csv'.format(DATA_DIRECTORY)
 
 
@@ -23,7 +24,7 @@ def get_ldap_users(reload=False):
     if not reload and ldap_data_file.is_file():
         #return np.genfromtxt(LDAP_DATA_FILE, delimiter=';', skip_header=1)# dtype=(np.string_, int))
         # Pandas to the rescue!
-        return pd.read_csv(LDAP_DATA_FILE)
+        return pd.read_csv(LDAP_DATA_FILE, sep=CSV_SEPARATOR)
 
     # Request scraping content
     r = requests.get('http://{}/'.format(LDAP_SCRAPE_HOST))
@@ -34,8 +35,8 @@ def get_ldap_users(reload=False):
 
     # Scrape
     soup = BeautifulSoup(r.text, 'html.parser')
-    users = ['USERS']
-    uids = ['UIDS']
+    users = ['USER']
+    uids = ['UID']
     for option in soup.find_all('option'):
         user = option.get_text().strip()
         uid = option.get('value').strip()
@@ -49,12 +50,15 @@ def get_ldap_users(reload=False):
     if not os.path.exists(DATA_DIRECTORY):
         os.makedirs(DATA_DIRECTORY)
 
+    csv_data = pd.DataFrame({users[0]: users[1:], uids[0]: uids[1:]}).drop_duplicates()
+
     # Save data to disk
-    np.savetxt(LDAP_DATA_FILE, np.c_[users, uids], delimiter=';', fmt='%s')
+    csv_data.to_csv(LDAP_DATA_FILE, sep=CSV_SEPARATOR, index=False)
     return get_ldap_users()
 
 
 def get_drinks_data(reload=False):
+    # See https://stackoverflow.com/a/23931368
     return
 
 
@@ -62,5 +66,5 @@ if __name__ == '__main__':
     users = get_ldap_users()
     drinks_data = get_drinks_data()
 
-    print(users)
     print(drinks_data)
+    # psycopg2 csv export query via python's ssh lib
