@@ -3,26 +3,33 @@
 
 import os
 import requests
+import psycopg2
 
-import numpy as np
 import pandas as pd
 
 from pathlib import Path
 from bs4 import BeautifulSoup # TODO Fix version in requirements.txt
+from sshtunnel import SSHTunnelForwarder
 
 LDAP_SCRAPE_HOST = '192.168.3.231' # power-pi.fd ?
 DRINKS_DATA_HOST = '192.168.3.231' # drinks.fd
 
+SSH_PORT = 22
+SSH_USERNAME = '' # Please see:
+SSH_PASSWORD = '' # https://www.raspberrypi.org/documentation/linux/usage/users.md
+SSH_REMOTE_BIND = ('127.0.0.1', 5432)
+SSH_LOCAL_BIND = SSH_REMOTE_BIND
+
 DATA_DIRECTORY = 'data'
 CSV_SEPARATOR = ';'
 LDAP_DATA_FILE = '{}/users.csv'.format(DATA_DIRECTORY)
+DRINKS_DATA_FILE = '{}/drinks.csv'.format(DATA_DIRECTORY)
 
 
 def get_ldap_users(reload=False):
     # Load local data if it exists and reloading is disabled
     ldap_data_file = Path(LDAP_DATA_FILE)
     if not reload and ldap_data_file.is_file():
-        #return np.genfromtxt(LDAP_DATA_FILE, delimiter=';', skip_header=1)# dtype=(np.string_, int))
         # Pandas to the rescue!
         return pd.read_csv(LDAP_DATA_FILE, sep=CSV_SEPARATOR)
 
@@ -56,9 +63,46 @@ def get_ldap_users(reload=False):
     csv_data.to_csv(LDAP_DATA_FILE, sep=CSV_SEPARATOR, index=False)
     return get_ldap_users()
 
+def postgres_query(query):
+    try:
+        conn = psycopg2.connect("dbname='drinks' user='postgres' host='localhost'")
+    except:
+        raise("I am unable to connect to the database")
+
+    cur = conn.cursor()
+    cur.execute(query)
+    rows = cur.fetchall()
+
+    print("\nShow me the databases:\n")
+    for row in rows:
+        print("   ", row)
+
+
+def ssh_postgres_query(query):
+    with SSHTunnelForwarder(
+            (DRINKS_DATA_HOST, SSH_PORT),
+            ssh_username=SSH_USERNAME,
+            ssh_password=SSH_PASSWORD,
+            remote_bind_address=SSH_REMOTE_BIND,
+            local_bind_address=SSH_LOCAL_BIND,
+    ) as tunnel:
+        print(query)
+        print(tunnel)
+        print(postgres_query(query))
+    print("DONE!")
+
+
 
 def get_drinks_data(reload=False):
-    # See https://stackoverflow.com/a/23931368
+    # Load local data if it exists and reloading is disabled
+    drinks_data_file = Path(DRINKS_DATA_FILE)
+    if not reload and drinks_data_file.is_file():
+        # Pandas to the rescue!
+        return pd.read_csv(DRINKS_DATA_FILE, sep=CSV_SEPARATOR)
+
+    # See https://stackoverflow.com/q/43891181
+    ssh_postgres_query("SELECT * FROM drink;")
+
     return
 
 
