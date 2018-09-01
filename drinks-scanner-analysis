@@ -49,7 +49,10 @@ def get_users(reload=False):
     # Load local data if it exists and reloading is disabled
     ldap_data_file = Path(LDAP_DATA_FILE)
     if not reload and ldap_data_file.is_file():
-        return pd.read_csv(LDAP_DATA_FILE, sep=CSV_SEPARATOR)
+        return pd.read_csv(LDAP_DATA_FILE, sep=CSV_SEPARATOR, dtype={
+            'USER_NAME': 'str',
+            'USER_ID': 'int'
+        })
 
     # Request scraping content
     r = requests.get('http://{}/'.format(LDAP_SCRAPE_HOST))
@@ -60,8 +63,8 @@ def get_users(reload=False):
 
     # Scrape
     soup = BeautifulSoup(r.text, 'html.parser')
-    users = ['USER']
-    uids = ['UID']
+    users = ['USER_NAME']
+    uids = ['USER_ID']
     for option in soup.find_all('option'):
         user = option.get_text().strip()
         uid = option.get('value').strip()
@@ -81,6 +84,7 @@ def get_users(reload=False):
     csv_data.to_csv(LDAP_DATA_FILE, sep=CSV_SEPARATOR, index=False)
     logger.info("Saved data to: {}/{}".format(os.getcwd(), LDAP_DATA_FILE))
     return get_users()
+
 
 def postgres_query(query):
     try:
@@ -116,7 +120,10 @@ def postgres_data(map_dict, sql_query, data_file_path, reload=False):
     # Load local data if it exists and reloading is disabled
     data_file = Path(data_file_path)
     if not reload and data_file.is_file():
-        return pd.read_csv(data_file_path, sep=CSV_SEPARATOR)
+        map_dtypes = {}
+        for k, v in map_dict.items():
+            map_dtypes[k] = v[1]
+        return pd.read_csv(data_file_path, sep=CSV_SEPARATOR, dtype=map_dtypes)
 
     # Query data otherwise
     try:
@@ -128,7 +135,7 @@ def postgres_data(map_dict, sql_query, data_file_path, reload=False):
     data_raw = pd.DataFrame(data_raw)
     data = {}
     for k, v in map_dict.items():
-        data[k] = data_raw[v]
+        data[k] = data_raw[v[0]]
     data = pd.DataFrame(data)
 
     # Save data to disk
@@ -139,10 +146,10 @@ def postgres_data(map_dict, sql_query, data_file_path, reload=False):
 
 def get_drinks(reload=False):
     map_dict = {
-        "EAN": 1,
-        "NAME": 2,
-        "SIZE": 3,
-        "TYPE": 5,
+        "EAN": (1, str),
+        "NAME": (2, str),
+        "SIZE": (3, float),
+        "TYPE": (5, str),
     }
     sql_query = "SELECT * FROM drink;"
     data_file_path = DRINKS_DATA_FILE
@@ -151,25 +158,30 @@ def get_drinks(reload=False):
 
 def get_scans(reload=False):
     map_dict = {
-        "BARCODE": 1,
-        "USER_ID": 2,
-        "TIMESTAMP": 3,
+        "EAN": (1, str),
+        "USER_ID": (2, str),
+        "TIMESTAMP": (3, str),
     }
     sql_query = "SELECT * FROM scanevent;"
     data_file_path = SCAN_DATA_FILE
-    return postgres_data(map_dict, sql_query, data_file_path, reload=reload)
+    data = postgres_data(map_dict, sql_query, data_file_path, reload=reload)
+    data['TIMESTAMP'] = pd.to_datetime(data['TIMESTAMP'])
+    return data
 
 
 def get_recharges(reload=False):
     map_dict = {
-        "USER_ID": 1,
-        "HELPER_USER_ID": 2,
-        "AMOUNT": 3,
-        "TIMESTAMP": 4,
+        "USER_ID": (1, str),
+        "HELPER_USER_ID": (2, str),
+        "AMOUNT": (3, float),
+        "TIMESTAMP": (4, str),
     }
-    sql_query = "SELECT * FROM scanevent;"
+    sql_query = "SELECT * FROM rechargeevent;"
     data_file_path = RECHARGE_DATA_FILE
-    return postgres_data(map_dict, sql_query, data_file_path, reload=reload)
+    data = postgres_data(map_dict, sql_query, data_file_path, reload=reload)
+    data['TIMESTAMP'] = pd.to_datetime(data['TIMESTAMP'])
+    return data
+
 
 
 if __name__ == '__main__':
