@@ -162,6 +162,8 @@ if __name__ == '__main__':
                         help='Disable output to stdout')
     parser.add_argument('--disable-logging', action='store_true',
                         help='Disable logging')
+    parser.add_argument('--reload-data', action='store_true',
+                        help='Enable reloading locally cached data')
     args = parser.parse_args()
 
     # Create logger
@@ -179,9 +181,9 @@ if __name__ == '__main__':
         handler_file.setFormatter(formatter)
         logger.addHandler(handler_file)
 
-    users = get_users()
-    drinks = get_drinks()
-    scans = get_scans()
-    recharges = get_recharges()
+    users = get_users(reload=args.reload_data)
+    drinks = get_drinks(reload=args.reload_data)
+    scans = get_scans(reload=args.reload_data)
+    recharges = get_recharges(reload=args.reload_data)
 
     # TODO Interpret data
