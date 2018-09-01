@@ -220,6 +220,7 @@ if __name__ == '__main__':
         handler_file.setFormatter(formatter)
         logger.addHandler(handler_file)
 
+    # Load and preprocess data
     users = get_users(reload=args.reload_data)
     drinks = get_drinks(reload=args.reload_data)
 
