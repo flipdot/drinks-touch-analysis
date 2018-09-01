@@ -25,6 +25,7 @@ CSV_SEPARATOR = ';'
 LDAP_DATA_FILE = '{}/users.csv'.format(DATA_DIRECTORY)
 DRINKS_DATA_FILE = '{}/drinks.csv'.format(DATA_DIRECTORY)
 SCAN_DATA_FILE = '{}/scans.csv'.format(DATA_DIRECTORY)
+RECHARGE_DATA_FILE = '{}/recharges.csv'.format(DATA_DIRECTORY)
 
 
 def get_ldap_users(reload=False):
@@ -124,9 +125,27 @@ def get_scan_data(reload=False):
     return scan_data
 
 
+def get_recharge_data(reload=False):
+    # Load local data if it exists and reloading is disabled
+    recharge_data_file = Path(RECHARGE_DATA_FILE)
+    if not reload and recharge_data_file.is_file():
+        # Pandas to the rescue!
+        return pd.read_csv(RECHARGE_DATA_FILE, sep=CSV_SEPARATOR)
+
+    # See https://stackoverflow.com/q/43891181
+    recharge_data_raw = pd.DataFrame(ssh_postgres_query("SELECT * FROM rechargeevent;"))
+    recharge_data = pd.DataFrame({
+        "USER_ID": recharge_data_raw[1],
+        "HELPER_USER_ID": recharge_data_raw[2],
+        "AMOUNT": recharge_data_raw[3],
+        "TIMESTAMP": recharge_data_raw[4],
+    })
+
+    return recharge_data
+
+
 if __name__ == '__main__':
     users = get_ldap_users()
     drinks_data = get_drinks_data()
     scan_data = get_scan_data()
-
-    # psycopg2 csv export query via python's ssh lib
+    recharge_data = get_recharge_data()
