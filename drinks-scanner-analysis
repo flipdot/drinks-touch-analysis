@@ -32,7 +32,6 @@ def get_ldap_users(reload=False):
     # Load local data if it exists and reloading is disabled
     ldap_data_file = Path(LDAP_DATA_FILE)
     if not reload and ldap_data_file.is_file():
-        # Pandas to the rescue!
         return pd.read_csv(LDAP_DATA_FILE, sep=CSV_SEPARATOR)
 
     # Request scraping content
@@ -63,6 +62,7 @@ def get_ldap_users(reload=False):
 
     # Save data to disk
     csv_data.to_csv(LDAP_DATA_FILE, sep=CSV_SEPARATOR, index=False)
+    print("Saved data to: {}/{}".format(os.getcwd(), LDAP_DATA_FILE))
     return get_ldap_users()
 
 def postgres_query(query):
@@ -88,66 +88,58 @@ def ssh_postgres_query(query):
         return postgres_query(query)
 
 
-def get_drinks_data(reload=False):
+def postgres_data(map_dict, sql_query, data_file_path, reload=False):
     # Load local data if it exists and reloading is disabled
-    drinks_data_file = Path(DRINKS_DATA_FILE)
-    if not reload and drinks_data_file.is_file():
-        # Pandas to the rescue!
-        return pd.read_csv(DRINKS_DATA_FILE, sep=CSV_SEPARATOR)
+    data_file = Path(data_file_path)
+    if not reload and data_file.is_file():
+        return pd.read_csv(data_file_path, sep=CSV_SEPARATOR)
 
-    # See https://stackoverflow.com/q/43891181
-    drinks_data_raw = pd.DataFrame(ssh_postgres_query("SELECT * FROM drink;"))
-    drinks_data = pd.DataFrame({
-        "EAN": drinks_data_raw[1],
-        "NAME": drinks_data_raw[2],
-        "SIZE": drinks_data_raw[3],
-        "TYPE": drinks_data_raw[5],
-    })
+    # Query data otherwise
+    data_raw = pd.DataFrame(ssh_postgres_query(sql_query))
+    data = {}
+    for k, v in map_dict.items():
+        data[k] = data_raw[v]
+    data = pd.DataFrame(data)
 
     # Save data to disk
-    drinks_data.to_csv(DRINKS_DATA_FILE, sep=CSV_SEPARATOR, index=False)
-    return get_drinks_data()
+    data.to_csv(data_file_path, sep=CSV_SEPARATOR, index=False)
+    print("Saved data to: {}/{}".format(os.getcwd(), data_file_path))
+    return postgres_data(map_dict, sql_query, data_file_path, reload=False)
+
+
+def get_drinks_data(reload=False):
+    map_dict = {
+        "EAN": 1,
+        "NAME": 2,
+        "SIZE": 3,
+        "TYPE": 5,
+    }
+    sql_query = "SELECT * FROM drink;"
+    data_file_path = DRINKS_DATA_FILE
+    return postgres_data(map_dict, sql_query, data_file_path, reload=reload)
 
 
 def get_scan_data(reload=False):
-    # Load local data if it exists and reloading is disabled
-    scan_data_file = Path(SCAN_DATA_FILE)
-    if not reload and scan_data_file.is_file():
-        # Pandas to the rescue!
-        return pd.read_csv(SCAN_DATA_FILE, sep=CSV_SEPARATOR)
-
-    # See https://stackoverflow.com/q/43891181
-    scan_data_raw = pd.DataFrame(ssh_postgres_query("SELECT * FROM scanevent;"))
-    scan_data = pd.DataFrame({
-        "BARCODE": scan_data_raw[1],
-        "USER_ID": scan_data_raw[2],
-        "TIMESTAMP": scan_data_raw[3],
-    })
-
-    # Save data to disk
-    scan_data.to_csv(SCAN_DATA_FILE, sep=CSV_SEPARATOR, index=False)
-    return get_scan_data()
+    map_dict = {
+        "BARCODE": 1,
+        "USER_ID": 2,
+        "TIMESTAMP": 3,
+    }
+    sql_query = "SELECT * FROM scanevent;"
+    data_file_path = SCAN_DATA_FILE
+    return postgres_data(map_dict, sql_query, data_file_path, reload=reload)
 
 
 def get_recharge_data(reload=False):
-    # Load local data if it exists and reloading is disabled
-    recharge_data_file = Path(RECHARGE_DATA_FILE)
-    if not reload and recharge_data_file.is_file():
-        # Pandas to the rescue!
-        return pd.read_csv(RECHARGE_DATA_FILE, sep=CSV_SEPARATOR)
-
-    # See https://stackoverflow.com/q/43891181
-    recharge_data_raw = pd.DataFrame(ssh_postgres_query("SELECT * FROM rechargeevent;"))
-    recharge_data = pd.DataFrame({
-        "USER_ID": recharge_data_raw[1],
-        "HELPER_USER_ID": recharge_data_raw[2],
-        "AMOUNT": recharge_data_raw[3],
-        "TIMESTAMP": recharge_data_raw[4],
-    })
-
-    # Save data to disk
-    recharge_data.to_csv(RECHARGE_DATA_FILE, sep=CSV_SEPARATOR, index=False)
-    return get_recharge_data()
+    map_dict = {
+        "USER_ID": 1,
+        "HELPER_USER_ID": 2,
+        "AMOUNT": 3,
+        "TIMESTAMP": 4,
+    }
+    sql_query = "SELECT * FROM scanevent;"
+    data_file_path = RECHARGE_DATA_FILE
+    return postgres_data(map_dict, sql_query, data_file_path, reload=reload)
 
 
 if __name__ == '__main__':
