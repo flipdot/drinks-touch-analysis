@@ -36,6 +36,14 @@ DATE_STR = datetime.date.today().isoformat()
 FILE_STR = os.path.basename(__file__).replace('.py', '')
 LOG_FILE = os.path.join(LOG_DIRECTORY, "{}-{}.log".format(FILE_STR, DATE_STR))
 
+LOG_LEVELS = {
+    'debug': logging.DEBUG,
+    'info': logging.INFO,
+    'warning': logging.WARNING,
+    'error': logging.ERROR,
+    'critical': logging.CRITICAL,
+}
+
 
 def get_users(reload=False):
     # Load local data if it exists and reloading is disabled
@@ -178,12 +186,17 @@ if __name__ == '__main__':
                         help='Disable logging')
     parser.add_argument('--reload-data', action='store_true',
                         help='Enable reloading locally cached data')
+    parser.add_argument('--log-level', choices=LOG_LEVELS,
+                        help='Set log level accordingly')
     args = parser.parse_args()
 
     # Create logger
     logger = logging.getLogger()
     formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
-    logger.setLevel(logging.DEBUG)
+    if not args.log_level:
+        logger.setLevel(logging.INFO)
+    else:
+        logger.setLevel(LOG_LEVELS[args.log_level])
 
     if not args.disable_stdout:
         handler_stream = logging.StreamHandler()
