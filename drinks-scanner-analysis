@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 # Loads drinks purchase statistics with according user database and plots it in a meaningful way.
 
+import datetime
+import logging
 import os
-import requests
 import psycopg2
+import requests
 
 import pandas as pd
 
@@ -26,6 +28,11 @@ LDAP_DATA_FILE = '{}/users.csv'.format(DATA_DIRECTORY)
 DRINKS_DATA_FILE = '{}/drinks.csv'.format(DATA_DIRECTORY)
 SCAN_DATA_FILE = '{}/scans.csv'.format(DATA_DIRECTORY)
 RECHARGE_DATA_FILE = '{}/recharges.csv'.format(DATA_DIRECTORY)
+
+LOG_DIRECTORY = 'logs'
+DATE_STR = datetime.date.today().isoformat()
+FILE_STR = os.path.basename(__file__).replace('.py', '')
+LOG_FILE = os.path.join(LOG_DIRECTORY, "{}-{}.log".format(FILE_STR, DATE_STR))
 
 
 def get_users(reload=False):
@@ -62,7 +69,7 @@ def get_users(reload=False):
 
     # Save data to disk
     csv_data.to_csv(LDAP_DATA_FILE, sep=CSV_SEPARATOR, index=False)
-    print("Saved data to: {}/{}".format(os.getcwd(), LDAP_DATA_FILE))
+    logger.info("Saved data to: {}/{}".format(os.getcwd(), LDAP_DATA_FILE))
     return get_users()
 
 def postgres_query(query):
@@ -143,10 +150,25 @@ def get_recharges(reload=False):
 
 
 if __name__ == '__main__':
+    # Create empty directories if they don't exist
+    for dir in (LOG_DIRECTORY, DATA_DIRECTORY):
+        if not os.path.exists(dir):
+            os.makedirs(dir)
+
+    # Create logger
+    logger = logging.getLogger()
+    formatter = logging.Formatter('%(asctime)s %(levelname)-8s %(message)s')
+    handler_stream = logging.StreamHandler()
+    handler_file = logging.FileHandler(LOG_FILE)
+    handler_stream.setFormatter(formatter)
+    handler_file.setFormatter(formatter)
+    logger.addHandler(handler_stream)
+    logger.addHandler(handler_file)
+    logger.setLevel(logging.DEBUG)
+
     users = get_users()
     drinks = get_drinks()
     scans = get_scans()
     recharges = get_recharges()
 
-    for data in users, drinks, scans, recharges:
-        print(data)
+    # TODO Interpret data
