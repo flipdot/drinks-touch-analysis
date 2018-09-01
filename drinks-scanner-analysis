@@ -222,7 +222,18 @@ if __name__ == '__main__':
 
     users = get_users(reload=args.reload_data)
     drinks = get_drinks(reload=args.reload_data)
+
     scans = get_scans(reload=args.reload_data)
+    scans_full = drinks.merge(users.merge(scans, 'inner', 'USER_ID'), 'inner', 'EAN')
+
     recharges = get_recharges(reload=args.reload_data)
+    recharges_full = users.merge(users.merge(recharges, 'inner', 'USER_ID'), 'inner', left_on='USER_ID', right_on='HELPER_USER_ID')
+    recharges_full = recharges_full.drop(columns=('HELPER_USER_ID'))
+    recharges_full = recharges_full.rename(columns={
+        'USER_NAME_x' : 'HELPER_USER_NAME',
+        'USER_ID_x' : 'HELPER_USER_ID',
+        'USER_NAME_y' : 'USER_NAME',
+        'USER_ID_y' : 'USER_ID',
+    })
 
     # TODO Interpret data
