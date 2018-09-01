@@ -50,8 +50,8 @@ def get_users(reload=False):
     ldap_data_file = Path(LDAP_DATA_FILE)
     if not reload and ldap_data_file.is_file():
         return pd.read_csv(LDAP_DATA_FILE, sep=CSV_SEPARATOR, dtype={
-            'USER_NAME': 'str',
-            'USER_ID': 'int'
+            'USER_NAME': str,
+            'USER_ID': str
         })
 
     # Request scraping content
