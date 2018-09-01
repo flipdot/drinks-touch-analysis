@@ -66,16 +66,13 @@ def get_ldap_users(reload=False):
 def postgres_query(query):
     try:
         conn = psycopg2.connect("dbname='drinks' user='postgres' host='localhost'")
-    except:
-        raise("I am unable to connect to the database")
+    except ConnectionError as e:
+        raise ConnectionError("I am unable to connect to the database:\n{}".format(e))
 
     cur = conn.cursor()
     cur.execute(query)
     rows = cur.fetchall()
-
-    print("\nShow me the databases:\n")
-    for row in rows:
-        print("   ", row)
+    return rows
 
 
 def ssh_postgres_query(query):
@@ -85,12 +82,8 @@ def ssh_postgres_query(query):
             ssh_password=SSH_PASSWORD,
             remote_bind_address=SSH_REMOTE_BIND,
             local_bind_address=SSH_LOCAL_BIND,
-    ) as tunnel:
-        print(query)
-        print(tunnel)
-        print(postgres_query(query))
-    print("DONE!")
-
+    ):
+        return postgres_query(query)
 
 
 def get_drinks_data(reload=False):
@@ -101,9 +94,15 @@ def get_drinks_data(reload=False):
         return pd.read_csv(DRINKS_DATA_FILE, sep=CSV_SEPARATOR)
 
     # See https://stackoverflow.com/q/43891181
-    ssh_postgres_query("SELECT * FROM drink;")
+    drinks_data_raw = pd.DataFrame(ssh_postgres_query("SELECT * FROM drink;"))
+    drinks_data = pd.DataFrame({
+        "EAN": drinks_data_raw[1],
+        "NAME": drinks_data_raw[2],
+        "SIZE": drinks_data_raw[3],
+        "TYPE": list(drinks_data_raw[5]),
+    })
 
-    return
+    return drinks_data
 
 
 if __name__ == '__main__':
