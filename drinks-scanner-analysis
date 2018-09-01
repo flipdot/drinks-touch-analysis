@@ -133,7 +133,7 @@ def postgres_data(map_dict, sql_query, data_file_path, reload=False):
 
     # Save data to disk
     data.to_csv(data_file_path, sep=CSV_SEPARATOR, index=False)
-    print("Saved data to: {}/{}".format(os.getcwd(), data_file_path))
+    logger.info("Saved data to: {}/{}".format(os.getcwd(), data_file_path))
     return postgres_data(map_dict, sql_query, data_file_path, reload=False)
 
 
