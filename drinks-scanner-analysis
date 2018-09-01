@@ -24,6 +24,7 @@ DATA_DIRECTORY = 'data'
 CSV_SEPARATOR = ';'
 LDAP_DATA_FILE = '{}/users.csv'.format(DATA_DIRECTORY)
 DRINKS_DATA_FILE = '{}/drinks.csv'.format(DATA_DIRECTORY)
+SCAN_DATA_FILE = '{}/scans.csv'.format(DATA_DIRECTORY)
 
 
 def get_ldap_users(reload=False):
@@ -99,15 +100,33 @@ def get_drinks_data(reload=False):
         "EAN": drinks_data_raw[1],
         "NAME": drinks_data_raw[2],
         "SIZE": drinks_data_raw[3],
-        "TYPE": list(drinks_data_raw[5]),
+        "TYPE": drinks_data_raw[5],
     })
 
     return drinks_data
 
 
+def get_scan_data(reload=False):
+    # Load local data if it exists and reloading is disabled
+    scan_data_file = Path(SCAN_DATA_FILE)
+    if not reload and scan_data_file.is_file():
+        # Pandas to the rescue!
+        return pd.read_csv(SCAN_DATA_FILE, sep=CSV_SEPARATOR)
+
+    # See https://stackoverflow.com/q/43891181
+    scan_data_raw = pd.DataFrame(ssh_postgres_query("SELECT * FROM scanevent;"))
+    scan_data = pd.DataFrame({
+        "BARCODE": scan_data_raw[1],
+        "USER_ID": scan_data_raw[2],
+        "TIMESTAMP": scan_data_raw[3],
+    })
+
+    return scan_data
+
+
 if __name__ == '__main__':
     users = get_ldap_users()
     drinks_data = get_drinks_data()
+    scan_data = get_scan_data()
 
-    print(drinks_data)
     # psycopg2 csv export query via python's ssh lib
