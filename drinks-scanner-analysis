@@ -104,7 +104,9 @@ def get_drinks_data(reload=False):
         "TYPE": drinks_data_raw[5],
     })
 
-    return drinks_data
+    # Save data to disk
+    drinks_data.to_csv(DRINKS_DATA_FILE, sep=CSV_SEPARATOR, index=False)
+    return get_drinks_data()
 
 
 def get_scan_data(reload=False):
@@ -122,7 +124,9 @@ def get_scan_data(reload=False):
         "TIMESTAMP": scan_data_raw[3],
     })
 
-    return scan_data
+    # Save data to disk
+    scan_data.to_csv(SCAN_DATA_FILE, sep=CSV_SEPARATOR, index=False)
+    return get_scan_data()
 
 
 def get_recharge_data(reload=False):
@@ -141,11 +145,16 @@ def get_recharge_data(reload=False):
         "TIMESTAMP": recharge_data_raw[4],
     })
 
-    return recharge_data
+    # Save data to disk
+    recharge_data.to_csv(RECHARGE_DATA_FILE, sep=CSV_SEPARATOR, index=False)
+    return get_recharge_data()
 
 
 if __name__ == '__main__':
     users = get_ldap_users()
-    drinks_data = get_drinks_data()
-    scan_data = get_scan_data()
-    recharge_data = get_recharge_data()
+    drinks = get_drinks_data()
+    scans = get_scan_data()
+    recharges = get_recharge_data()
+
+    for data in users, drinks, scans, recharges:
+        print(data)
