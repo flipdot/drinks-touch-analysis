@@ -10,6 +10,9 @@ import requests
 import sys
 
 import pandas as pd
+import seaborn as sns
+import matplotlib.pyplot as plt
+import matplotlib.dates as mdates
 
 from pathlib import Path
 from bs4 import BeautifulSoup # TODO Fix version in requirements.txt
@@ -33,7 +36,7 @@ RECHARGE_DATA_FILE = '{}/recharges.csv'.format(DATA_DIRECTORY)
 
 LOG_DIRECTORY = 'logs'
 DATE_STR = datetime.date.today().isoformat()
-FILE_STR = os.path.basename(__file__).replace('.py', '')
+FILE_STR = os.path.basename(__file__ or '').replace('.py', '')
 LOG_FILE = os.path.join(LOG_DIRECTORY, "{}-{}.log".format(FILE_STR, DATE_STR))
 
 LOG_LEVELS = {
@@ -183,12 +186,252 @@ def get_recharges(reload=False):
     return data
 
 
+def plot_drink_consumption_by_name(scans_full):
+    """Plot drink consumption by name (total)"""
+    drinks_count = scans_full.groupby('NAME').size().sort_values(ascending=False)
+
+    # Limit by minimum count
+    #drinks_count = drinks_count.where(drinks_count > 50)
+
+    plt.xticks(rotation=90)
+    ax = sns.barplot(
+        x=drinks_count.index.where(drinks_count > 50),
+        y=drinks_count,
+        palette=sns.color_palette("Paired"))
+    ax.set(
+        xlabel='Getränkename',
+        ylabel='Gescannte Einheiten',
+        title='Gescannte Getränke nach Name',
+    )
+    plt.show()
+
+
+def plot_drink_consumption_by_category(scans_full):
+    """Plot drink consumption by category (total)"""
+    drinks_typed = scans_full.groupby(['TYPE', 'NAME']).size().sort_values(ascending=False).to_frame().reset_index()
+    ax = sns.swarmplot(x='TYPE', y=0, data=drinks_typed)
+    ax.set(
+        xlabel='Typ',
+        ylabel='Gescannte Einheiten',
+        title='Gescannte Getränke nach Typ',
+    )
+
+    drinks_categories = drinks_typed['TYPE'].unique()
+
+    # TODO Find out how to get categorical x position in swarm plot
+    #print(drinks_categories)
+    #print(drinks_typed)
+    #print(drinks_typed['TYPE'])
+
+    #for line in range(0, drinks_typed.shape[0]):
+    #    ax.text(
+    #        #drinks_typed.index[line] + 0.2,
+    #        drinks_typed['TYPE'] * 10,
+    #        drinks_typed.get(0)[line],
+    #        drinks_typed['NAME'][line],
+    #        horizontalalignment='left',
+    #    )
+
+    ## Annotate highest ranking
+    #drinks_highest = drinks_typed.groupby('TYPE').head(1)
+    ## Annotate lowest ranking
+    #drinks_lowest = drinks_typed.groupby('TYPE').tail(1)
+
+    ##for a in range(0, len(drinks_highest)):
+    ##    sp.text(drinks_highest['TYPE'][a],
+    ##            drinks_highest[0][a],
+    #            drinks_highest['NAME'][a])
+    plt.show()
+
+
+def plot_drink_total_consumption_by_person(scans_full):
+    scans_by_person = scans_full.sort_values(['USER_NAME', 'TYPE']).get(['USER_NAME', 'TYPE'])
+    scans_by_person = scans_by_person.groupby('USER_NAME').size().sort_values(ascending=False)
+
+    plt.xticks(rotation=90)
+    ax = sns.barplot(
+        x=scans_by_person.index.where(scans_by_person > 20),
+        y=scans_by_person,
+        palette=sns.color_palette("Paired")
+    )
+    ax.set(
+        xlabel='Member',
+        ylabel='Gescannte Getränke',
+        title='Gescannte Getränke nach Member',
+    )
+    plt.show()
+
+
+def plot_drink_categorized_consumption_by_person(scans_full):
+    scans_by_person = scans_full.sort_values(['USER_NAME', 'TYPE']).get(['USER_NAME', 'TYPE'])
+    scans_by_person = pd.crosstab(scans_by_person['USER_NAME'], scans_by_person['TYPE'])
+    scans_by_person = scans_by_person.stack().reset_index().rename(columns={0: 'value'})
+
+    fig, ax = plt.subplots(figsize=(18, 6))
+    plt.xticks(rotation=90)
+    sns.barplot(
+        x=scans_by_person.USER_NAME,
+        y=scans_by_person.value,
+        hue=scans_by_person.TYPE,
+        ax=ax,
+    )
+    ax.set(
+        xlabel='Member',
+        ylabel='Gescannte Getränke',
+        title='Gescannte Getränke nach Member und Typ',
+    )
+    plt.show()
+
+
+def plot_drink_categorized_consumption_by_person_and_time_of_day(scans_full):
+    scans_by_person = scans_full.sort_values(['USER_NAME', 'TYPE']).get(['USER_NAME', 'TYPE', 'TIMESTAMP'])
+    scans_by_person['TIMESTAMP'] = scans_by_person['TIMESTAMP'].apply(lambda x: x.hour)
+    scans_by_person = scans_by_person.groupby(['USER_NAME', 'TYPE', 'TIMESTAMP']).size()
+
+
+def plot_recharge_vouching_by_person(recharges_full):
+    recharges_names = recharges_full.get(['HELPER_USER_NAME', 'USER_NAME'])
+    recharges_names = pd.crosstab(recharges_names['USER_NAME'], recharges_names['HELPER_USER_NAME'])
+
+    # Create custom palette
+    max_value = recharges_names.max().max()
+    cutoff = 7
+    cpal = sns.hls_palette(max_value - 1 + cutoff, h=.5)
+    del cpal[-cutoff:]
+    cpal.insert(0, (.95, .95, .95))
+
+    fig, ax = plt.subplots(figsize=(8, 8))
+    ax = sns.heatmap(
+        recharges_names,
+        cmap=cpal,
+        square=True,
+        linewidths=1,
+        linecolor='white',
+    )
+    ax.set(
+        xlabel='Bürge',
+        ylabel='Aufladender',
+        title='Gebürgte Aufladungen unter Membern',
+    )
+
+    plt.show()
+
+
+def plot_drink_consumption_by_name_over_time(scans_full):
+    df = scans_full
+    df.set_index(pd.DatetimeIndex(df['TIMESTAMP']), inplace=True)
+    #ts = df.resample('M').sum()
+    ts = df.groupby(['USER_NAME', 'TYPE']).resample('M')['TIMESTAMP'].count()
+
+
+    df = ts.to_frame()
+    #df2 = df.reset_index()
+    #print(ts)
+    print(df.head())
+
+    print(df.reset_index(level='TYPE').reset_index(level='USER_NAME'))
+
+    #print(df["USER_NAME"])
+
+    return
+
+
+    for k, v in ts.groupby(['USER_NAME']).sum().items():
+        print(k, v)
+    return
+
+    #print(scans_full.groupby('USER_NAME').count())
+
+    #for d in dir(ts):
+    #    print(d)
+    print(ts.head())
+    #print(ts['TIMESTAMP'])
+    print(ts.values)
+    print(ts.index)
+
+
+    #sns.kdeplot(ts.values)
+    #sns.lineplot(hue=ts['USER_NAME'], data=ts.values)
+    sns.lineplot(hue=ts.index, data=ts.values)
+    plt.show()
+
+
+    return
+
+
+    print(ts['USER_NAME'])
+    print(ts['TYPE'])
+
+    sns.lineplot(
+        x=ts['TIMESTAMP'],
+        y=ts.values,
+    )
+    return
+
+    print(ts)
+    for k, v in ts.items():
+        print(k, v)
+    return
+
+
+    ############################################################
+
+    print("XXXX")
+    print(type(df['TIMESTAMP'][0]))
+    #df['TIMESTAMP'].replace(day=1)
+
+    print(pd.DatetimeIndex(df['TIMESTAMP']))
+    print(df.head())
+
+    #df = df.assign(TIMESTAMP = [mdates.date2num(x) for x in df['TIMESTAMP']])
+    df = df.assign(TIMESTAMP = [datetime.datetime(x) for x in df['TIMESTAMP']])
+    print(df.head())
+
+
+    return
+    #df = df.assign(YEAR_MONTH = ['{}-{:0=2d}'.format(x.year, x.month) for x in df['TIMESTAMP']])
+    # TODO
+    # Fix datetime objects to date objects with same day but different month
+    # After that, convert to matplotlib's own date format
+    # https://stackoverflow.com/a/31262531
+    print(type(df['TIMESTAMP'][0]))
+    df = df.assign(YEAR_MONTH = [mdates.date2num(x) for x in df['TIMESTAMP']])
+    #df = df.groupby(['USER_NAME', 'TYPE', 'YEAR_MONTH']).size()
+    df = df.groupby(['USER_NAME', 'TYPE', 'TIMESTAMP']).size()
+    print(df.head())
+    #df = df.get(['USER_NAME', 'TYPE', 'YEAR_MONTH'])
+    print(df.values)
+    print(type(df))
+    #print(df['TYPE'])
+    return
+    print(type(df['TIMESTAMP']))
+    fig, ax = plt.subplots()
+    #sns.kdeplot(df.values, shade=True)
+    #sns.lineplot(x=df['YEAR_MONTH'], y=df.values, time='YEAR_MONTH', value='values', ax=ax)
+    sns.lineplot(x=df['TIMESTAMP'], y=df.values, value='values', ax=ax)
+
+
+    # assign locator and formatter for the xaxis ticks.
+    ax.xaxis.set_major_locator(mdates.AutoDateLocator())
+    ax.xaxis.set_major_formatter(mdates.DateFormatter('%Y.%m.%d'))
+
+    # put the labels at 45deg since they tend to be too long
+    fig.autofmt_xdate()
+    plt.show()
+
+    return
+    #df = df.assign(YEAR = [x.year for x in df['TIMESTAMP']])
+    #df = df.assign(MONTH = [x.month for x in df['TIMESTAMP']])
+    #df = df.get(['USER_NAME', 'TYPE', 'YEAR', 'MONTH'])
+    #df = df.groupby(['USER_NAME', 'YEAR', 'MONTH', 'TYPE']).size()
+    #plt.show()
+
 
 if __name__ == '__main__':
     # Create empty directories if they don't exist
-    for dir in (LOG_DIRECTORY, DATA_DIRECTORY):
-        if not os.path.exists(dir):
-            os.makedirs(dir)
+    for directory in (LOG_DIRECTORY, DATA_DIRECTORY):
+        if not os.path.exists(directory):
+            os.makedirs(directory)
 
     # Argument parsing
     parser = argparse.ArgumentParser()
@@ -237,4 +480,19 @@ if __name__ == '__main__':
         'USER_ID_y' : 'USER_ID',
     })
 
-    # TODO Interpret data
+    # Print options for pandas
+    pd.set_option('display.max_columns', 1000)
+    #pd.set_option('display.max_rows', 1000)
+    pd.set_option('display.expand_frame_repr', False)
+
+    # Actual plotting
+    plot_drink_consumption_by_name(scans_full)
+    plot_drink_consumption_by_category(scans_full)
+    plot_drink_total_consumption_by_person(scans_full)
+    plot_drink_categorized_consumption_by_person(scans_full)
+    plot_drink_categorized_consumption_by_person_and_time_of_day(scans_full)
+    plot_recharge_vouching_by_person(recharges_full)
+    plot_drink_consumption_by_name_over_time(scans_full)
+
+
+    #plot_recharge_vouching_correlation_by_person(recharges_full)
